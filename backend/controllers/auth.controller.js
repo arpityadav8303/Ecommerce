@@ -1,21 +1,27 @@
-import {User} from "../modals/user.modal.js"
-import bcrypt from "bcrypt"
-import { generateToken } from "../utils/jwt.js"
+import { User } from "../modals/user.modal.js";
+import bcrypt from "bcrypt";
+import { generateToken } from "../utils/jwt.js";
+import { ApiError } from "../utils/Apierrors.js";
 
+// ============ REGISTER USER ============
 const registerUser = async (req, res) => {
     try {
-        const { name, email, password, phone, address } = req.body;
+        const name = req.body.name?.trim();
+        const email = req.body.email?.trim().toLowerCase();
+        const password = req.body.password?.trim();
+        const phone = req.body.phone?.trim();
+        const address = req.body.address?.trim();
 
-        if ([name, email, password, phone, address].some((field) => !field || field.trim() === "")) {
-            return res.status(400).json({ message: "All fields are required" })
+        if ([name, email, password, phone, address].some(field => !field)) {
+            throw new ApiError(400, "All fields are required");
         }
 
-        const user = await User.findOne({ email })
-        if (user) {
-            return res.status(400).json({ message: "User already exists" })
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            throw new ApiError(400, "User already exists");
         }
 
-        const hashedPassword = await bcrypt.hash(password, 10)
+        const hashedPassword = await bcrypt.hash(password, 10);
 
         const newUser = new User({
             name,
@@ -23,56 +29,73 @@ const registerUser = async (req, res) => {
             password: hashedPassword,
             phone,
             address
-        })
-        await newUser.save()
+        });
 
-        // Generate JWT token
-        const token = generateToken(newUser._id)
+        await newUser.save();
 
-        res.status(201).json({ 
-            message: "User registered successfully", 
-            userId: newUser._id,
-            token: token
-        })
+        const token = generateToken(newUser._id);
+
+        res.status(201).json({
+            success: true,
+            message: "User registered successfully",
+            data: {
+                userId: newUser._id,
+                token
+            }
+        });
 
     } catch (err) {
-        console.log(err)
-        res.status(500).json({ message: "Internal server error" })
+        console.error(err);
+        res.status(err.statusCode || 500).json({
+            success: false,
+            message: err.message || "Internal server error",
+            error: err.errors || []
+        });
     }
-}
+};
 
-const LoginUser = async (req, res) => {
+// ============ LOGIN USER ============
+const loginUser = async (req, res) => {
     try {
-        const { email, password } = req.body
+        const email = req.body.email?.trim().toLowerCase();
+        const password = req.body.password?.trim();
 
         if (!email || !password) {
-            return res.status(400).json({ message: "All fields are required" })
+            throw new ApiError(400, "All fields are required");
         }
 
-        const user = await User.findOne({ email })
+        const user = await User.findOne({ email });
         if (!user) {
-            return res.status(400).json({ message: "User does not exist" })
+            throw new ApiError(404, "User not found");
         }
 
-        const isPasswordCorrect = await user.isPasswordCorrect(password)
+        const isPasswordCorrect = user.isPasswordCorrect
+            ? await user.isPasswordCorrect(password)
+            : await bcrypt.compare(password, user.password);
+
         if (!isPasswordCorrect) {
-            return res.status(400).json({ message: "Incorrect password" })
+            throw new ApiError(401, "Invalid credentials");
         }
 
-        const token = generateToken(user._id)
+        const token = generateToken(user._id);
 
-        // Send response with token
-        res.status(200).json({ 
-            message: "Login successful", 
-            token: token,
-            userId: user._id
-        })
-    }
-    
-    catch(err){
-        console.log(err)
-        res.status(500).json({message:"Internal server error"})
-    }
-}
+        res.status(200).json({
+            success: true,
+            message: "Login successful",
+            data: {
+                userId: user._id,
+                token
+            }
+        });
 
-export { registerUser, LoginUser}
+    } catch (err) {
+        console.error(err);
+        res.status(err.statusCode || 500).json({
+            success: false,
+            message: err.message || "Internal server error",
+            error: err.errors || []
+        });
+    }
+};
+
+export { registerUser, loginUser };

@@ -1,184 +1,257 @@
+import mongoose from "mongoose"
 import { Product } from "../modals/product.modal.js"
+import { ApiError } from "../utils/Apierrors.js"
+import { uploadOnCloudinary } from "../utils/Cloudinary.js"
+
+// Helper to handle errors consistently
+const handleError = (err, res) => {
+    if (err instanceof ApiError) {
+        return res.status(err.statusCode).json({
+            success: err.success,
+            message: err.message,
+            errors: err.errors || []
+        })
+    }
+    console.error(err)
+    res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: err.message
+    })
+}
 
 // ============ GET ALL PRODUCTS ============
-// This function gets all products from database
 export const getAllProducts = async (req, res) => {
     try {
-        // Find all products in database collection
+        const page = parseInt(req.query.page) || 1
+        const limit = parseInt(req.query.limit) || 10
+        const skip = (page - 1) * limit
+
         const products = await Product.find()
-        
-        // Check if products exist and array is not empty
+            .lean()
+            .limit(limit)
+            .skip(skip)
+
         if (!products || products.length === 0) {
-            // Send error response if no products found
-            return res.status(404).json({ message: "No products found" })
+            throw new ApiError(404, "No products found")
         }
 
-        // Send success response with all products
-        res.status(200).json({
-            message: "Products retrieved successfully",
-            count: products.length, // Total number of products
-            products: products // Array of all products
-        })
+        const total = await Product.countDocuments()
 
+        res.status(200).json({
+            success: true,
+            message: "Products retrieved successfully",
+            pagination: {
+                total,
+                page,
+                pages: Math.ceil(total / limit)
+            },
+            count: products.length,
+            products
+        })
     } catch (err) {
-        // Log error to console for debugging
-        console.log(err)
-        // Send error response to client
-        res.status(500).json({ message: "Internal server error" })
+        handleError(err, res)
     }
 }
 
 // ============ GET PRODUCT BY ID ============
-// This function gets a single product using its ID
 export const getProductById = async (req, res) => {
     try {
-        // Extract ID from URL parameters (e.g., /products/:id)
         const { id } = req.params
 
-        // Find product with matching ID in database
-        const product = await Product.findById(id)
-
-        // Check if product exists in database
-        if (!product) {
-            // Send error if product not found
-            return res.status(404).json({ message: "Product not found" })
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            throw new ApiError(400, "Invalid product ID format")
         }
 
-        // Send success response with the product
-        res.status(200).json({
-            message: "Product retrieved successfully",
-            product: product // Single product object
-        })
+        const product = await Product.findById(id).lean()
 
+        if (!product) {
+            throw new ApiError(404, "Product not found")
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "Product retrieved successfully",
+            product
+        })
     } catch (err) {
-        // Log error to console
-        console.log(err)
-        // Send error response
-        res.status(500).json({ message: "Internal server error" })
+        handleError(err, res)
     }
-} 
+}
 
 // ============ GET PRODUCTS BY CATEGORY ============
-// This function gets all products in a specific category
 export const getProductsByCategory = async (req, res) => {
     try {
-        // Extract category name from URL (e.g., /category/:category)
         const { category } = req.params
 
-        // Check if category is provided
-        if (!category) {
-            // Send error if category is missing
-            return res.status(400).json({ message: "Category is required" })
+        if (!category || category.trim() === "") {
+            throw new ApiError(400, "Category is required")
         }
 
-        // Find all products matching the category
-        // $regex: searches for pattern (case-insensitive search)
-        // $options: "i" means ignore case (SHOES = shoes = Shoes)
-        const products = await Product.find({ 
-            category: { $regex: category, $options: "i" } 
-        })
+        const normalizedCategory = category.trim().toLowerCase()
+        const products = await Product.find({
+            category: { $regex: normalizedCategory, $options: "i" }
+        }).lean()
 
-        // Check if any products found in this category
         if (!products || products.length === 0) {
-            // Send error if no products in category
-            return res.status(404).json({ 
-                message: `No products found in category: ${category}` 
-            })
+            throw new ApiError(404, `No products found in ${category} category`)
         }
 
-        // Send success response with category products
         res.status(200).json({
+            success: true,
             message: `Products in ${category} category retrieved successfully`,
-            count: products.length, // Number of products in category
-            products: products // Array of products in category
+            count: products.length,
+            products
         })
-
     } catch (err) {
-        // Log error to console
-        console.log(err)
-        // Send error response
-        res.status(500).json({ message: "Internal server error" })
+        handleError(err, res)
     }
 }
 
-// ============ SEARCH PRODUCTS BY KEYWORD ============
-// This function searches for products by name, brand, or description
+// ============ SEARCH PRODUCTS ============
 export const searchProducts = async (req, res) => {
     try {
-        // Extract search keyword from query (e.g., ?keyword=nike)
         const { keyword } = req.query
 
-        // Check if keyword is provided
-        if (!keyword) {
-            // Send error if no keyword provided
-            return res.status(400).json({ message: "Search keyword is required" })
+        if (!keyword || keyword.trim() === "") {
+            throw new ApiError(400, "Search keyword is required")
         }
 
-        // Search products in multiple fields (name, description, brand)
-        // $or: search in any of these fields
-        // $regex: pattern matching
-        // $options: "i" means case-insensitive (ignore upper/lower case)
+        const normalizedKeyword = keyword.trim().toLowerCase()
         const products = await Product.find({
             $or: [
-                // Search in product name field
-                { name: { $regex: keyword, $options: "i" } },
-                // OR search in description field
-                { description: { $regex: keyword, $options: "i" } },
-                // OR search in brand field
-                { brand: { $regex: keyword, $options: "i" } }
+                { name: { $regex: normalizedKeyword, $options: "i" } },
+                { description: { $regex: normalizedKeyword, $options: "i" } },
+                { brand: { $regex: normalizedKeyword, $options: "i" } }
             ]
-        })
+        }).lean()
 
-        // Check if any products match the search
         if (!products || products.length === 0) {
-            // Send error if no products match search
-            return res.status(404).json({ 
-                message: `No products found matching: ${keyword}` 
-            })
+            throw new ApiError(404, `No products found matching "${keyword}"`)
         }
 
-        // Send success response with search results
         res.status(200).json({
+            success: true,
             message: `Search results for "${keyword}"`,
-            count: products.length, // Number of matching products
-            products: products // Array of matching products
+            count: products.length,
+            products
         })
-
     } catch (err) {
-        // Log error to console
-        console.log(err)
-        // Send error response
-        res.status(500).json({ message: "Internal server error" })
+        handleError(err, res)
     }
 }
 
+// ============ ADD PRODUCT WITH CLOUDINARY IMAGE UPLOAD ============
+export const addProduct = async (req, res) => {
+    try {
+        console.log("📥 Add Product Request Received")
+        console.log("Body:", req.body)
+        console.log("Files:", req.files ? `${req.files.length} files` : "No files")
 
+        // Get fields from req.body
+        const { name, price, description, category, brand, stock } = req.body
 
-export const addProduct=async(req,res)=>{
-    try{
-        const {name,price,description,images,category,brand,stock,rating,reviews}=req.body
-        if(!name||!price||!description||!images||!category||!brand||!stock){
-            return res.status(400).json({message:"All fields are required"})
-        
+        // ============ CONVERT STRING VALUES TO CORRECT TYPES ============
+        // Form-data sends everything as strings, need to convert
+        const parsedPrice = parseFloat(price)
+        const parsedStock = parseInt(stock)
+
+        console.log(`Name: ${name}, Price: ${parsedPrice}, Stock: ${parsedStock}`)
+
+        // ============ VALIDATE ALL REQUIRED FIELDS ============
+        if (!name || !price || !description||!category || !brand || stock === undefined) {
+            console.error("❌ Missing fields:", { name, price, category,description, brand, stock })
+            throw new ApiError(400, "All fields are required")
         }
-        const product=new Product({
-            name,
-            price,
-            description,
-            images,
-            category,
-            brand,
-            stock,
-            rating,
-            reviews
-        })
-        await product.save()
-        res.status(201).json({message:"Product added successfully"})
-        
 
-    }
-    catch(err){
-        res.status(500).json({message:"Internal server error"})
-    
+        // ============ VALIDATE FIELD TYPES ============
+        if (typeof name !== "string" || name.trim() === "") {
+            throw new ApiError(400, "Product name must be a non-empty string")
+        }
+
+        if (isNaN(parsedPrice) || parsedPrice <= 0) {
+            throw new ApiError(400, "Price must be a valid positive number")
+        }
+
+        if (typeof description !== "string" || description.trim() === "") {
+            throw new ApiError(400, "Description must be a non-empty string")
+        }
+
+        if (isNaN(parsedStock) || parsedStock < 0) {
+            throw new ApiError(400, "Stock must be a valid non-negative number")
+        }
+
+        // ============ VALIDATE IMAGE FILES ============
+        console.log("🖼️ Checking for images...")
+        if (!req.files || req.files.length === 0) {
+            console.error("❌ No files uploaded")
+            throw new ApiError(400, "At least one image is required")
+        }
+
+        console.log(`✅ Found ${req.files.length} files`)
+
+        // ============ CHECK DUPLICATE PRODUCT ============
+        const existingProduct = await Product.findOne({ name })
+        if (existingProduct) {
+            throw new ApiError(400, "Product with this name already exists")
+        }
+
+        // ============ UPLOAD IMAGES TO CLOUDINARY ============
+        const imageUrls = []
+
+        for (let i = 0; i < req.files.length; i++) {
+            const file = req.files[i]
+            try {
+                console.log(`📤 [${i + 1}/${req.files.length}] Uploading: ${file.originalname}`)
+                console.log(`📁 File path: ${file.path}`)
+
+                // Upload to Cloudinary
+                const cloudinaryResponse = await uploadOnCloudinary(file.path)
+
+                if (cloudinaryResponse && cloudinaryResponse.url) {
+                    imageUrls.push(cloudinaryResponse.url)
+                    console.log(`✅ [${i + 1}/${req.files.length}] Uploaded: ${cloudinaryResponse.url}`)
+                } else {
+                    console.error(`❌ Cloudinary returned no URL for ${file.originalname}`)
+                    throw new ApiError(400, `Failed to upload image: ${file.originalname}`)
+                }
+            } catch (uploadError) {
+                console.error(`❌ Error uploading ${file.originalname}:`, uploadError.message)
+                throw new ApiError(400, `Failed to upload image: ${file.originalname}`)
+            }
+        }
+
+        // ============ VALIDATE ALL IMAGES UPLOADED ============
+        if (imageUrls.length === 0) {
+            throw new ApiError(400, "No images were successfully uploaded to Cloudinary")
+        }
+
+        console.log(`✅ All ${imageUrls.length} images uploaded successfully`)
+
+        // ============ CREATE PRODUCT ============
+        const product = new Product({
+            name: name.trim(),
+            price: parsedPrice,
+            description: description.trim(),
+            images: imageUrls,
+            category: category.trim(),
+            brand: brand.trim(),
+            stock: parsedStock
+        })
+
+        // ============ SAVE TO DATABASE ============
+        await product.save()
+        console.log(`✅ Product saved to database: ${product._id}`)
+
+        // ============ SEND SUCCESS RESPONSE ============
+        res.status(201).json({
+            success: true,
+            message: "Product added successfully",
+            product
+        })
+
+    } catch (err) {
+        console.error("❌ Error in addProduct:", err.message)
+        handleError(err, res)
     }
 }
