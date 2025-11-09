@@ -56,7 +56,7 @@ export const getProductById = async (req, res) => {
         // Send error response
         res.status(500).json({ message: "Internal server error" })
     }
-}
+} 
 
 // ============ GET PRODUCTS BY CATEGORY ============
 // This function gets all products in a specific category
@@ -149,5 +149,36 @@ export const searchProducts = async (req, res) => {
         console.log(err)
         // Send error response
         res.status(500).json({ message: "Internal server error" })
+    }
+}
+
+
+
+export const addProduct=async(req,res)=>{
+    try{
+        const {name,price,description,images,category,brand,stock,rating,reviews}=req.body
+        if(!name||!price||!description||!images||!category||!brand||!stock){
+            return res.status(400).json({message:"All fields are required"})
+        
+        }
+        const product=new Product({
+            name,
+            price,
+            description,
+            images,
+            category,
+            brand,
+            stock,
+            rating,
+            reviews
+        })
+        await product.save()
+        res.status(201).json({message:"Product added successfully"})
+        
+
+    }
+    catch(err){
+        res.status(500).json({message:"Internal server error"})
+    
     }
 }
