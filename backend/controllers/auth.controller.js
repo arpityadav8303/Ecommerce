@@ -55,41 +55,53 @@ const registerUser = async (req, res) => {
 };
 
 // ============ LOGIN USER ============
+
 const loginUser = async (req, res) => {
     try {
         const email = req.body.email?.trim().toLowerCase();
         const password = req.body.password?.trim();
 
+        // Validate presence of fields
         if (!email || !password) {
-            throw new ApiError(400, "All fields are required");
+            throw new ApiError(400, "Email and password are required");
         }
 
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            throw new ApiError(400, "Invalid email format");
+        }
+
+        // Find user by email
         const user = await User.findOne({ email });
         if (!user) {
-            throw new ApiError(404, "User not found");
+            // Avoid revealing whether the email exists
+            throw new ApiError(401, "Invalid credentials");
         }
 
-        const isPasswordCorrect = user.isPasswordCorrect
-            ? await user.isPasswordCorrect(password)
-            : await bcrypt.compare(password, user.password);
-
+        // Compare password
+        const isPasswordCorrect = await bcrypt.compare(password, user.password);
         if (!isPasswordCorrect) {
             throw new ApiError(401, "Invalid credentials");
         }
 
+        // Generate JWT token
         const token = generateToken(user._id);
 
+        // Respond with token and basic user info
         res.status(200).json({
             success: true,
             message: "Login successful",
             data: {
                 userId: user._id,
+                name: user.name,
+                email: user.email,
                 token
             }
         });
 
     } catch (err) {
-        console.error(err);
+        console.error("❌ Login error:", err.message);
         res.status(err.statusCode || 500).json({
             success: false,
             message: err.message || "Internal server error",
@@ -97,5 +109,7 @@ const loginUser = async (req, res) => {
         });
     }
 };
+
+
 
 export { registerUser, loginUser };

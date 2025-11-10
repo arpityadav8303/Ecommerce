@@ -15,7 +15,8 @@ const UserSchema=new mongoose.Schema(
         },
         password:{
             type:String,
-            required:true
+            required:true,
+            minlength: 8
         },
         phone:{
             type:String,
@@ -36,8 +37,13 @@ UserSchema.pre("save",async function(next){
     if(!this.isModified("password")){
        return  next()
     }
-    this.password= bcrypt.hash(this.password,10)
-    next()
+   try {
+        // ✅ ADD AWAIT HERE
+        this.password = await bcrypt.hash(this.password, 10);
+        next();
+    } catch (error) {
+        next(error);
+    }
 })
 
 UserSchema.methods.isPasswordCorrect=async function(password){

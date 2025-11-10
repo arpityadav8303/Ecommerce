@@ -159,10 +159,11 @@ export const addProduct = async (req, res) => {
         console.log(`Name: ${name}, Price: ${parsedPrice}, Stock: ${parsedStock}`)
 
         // ============ VALIDATE ALL REQUIRED FIELDS ============
-        if (!name || !price || !description||!category || !brand || stock === undefined) {
-            console.error("❌ Missing fields:", { name, price, category,description, brand, stock })
-            throw new ApiError(400, "All fields are required")
+       if(!name || !price|| !description ||!category || !brand || stock === undefined) {
+         console.error("❌ Missing fields:", { name, price, category,description, brand, stock })
+          throw new ApiError(400, "All fields are required") 
         }
+
 
         // ============ VALIDATE FIELD TYPES ============
         if (typeof name !== "string" || name.trim() === "") {
