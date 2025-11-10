@@ -21,12 +21,10 @@ const registerUser = async (req, res) => {
             throw new ApiError(400, "User already exists");
         }
 
-        const hashedPassword = await bcrypt.hash(password, 10);
-
         const newUser = new User({
             name,
             email,
-            password: hashedPassword,
+            password,
             phone,
             address
         });
@@ -61,6 +59,11 @@ const loginUser = async (req, res) => {
         const email = req.body.email?.trim().toLowerCase();
         const password = req.body.password?.trim();
 
+        console.log("🔍 LOGIN DEBUG:");
+        console.log("Email received:", email);
+        console.log("Password received:", password);
+        console.log("Password length:", password?.length);
+
         // Validate presence of fields
         if (!email || !password) {
             throw new ApiError(400, "Email and password are required");
@@ -74,19 +77,30 @@ const loginUser = async (req, res) => {
 
         // Find user by email
         const user = await User.findOne({ email });
+        console.log("🔍 User found in DB:", user ? "YES ✅" : "NO ❌");
+        
+        if (user) {
+            console.log("User ID:", user._id);
+            console.log("User email in DB:", user.email);
+            console.log("Password hash in DB:", user.password?.substring(0, 20) + "...");
+        }
+
         if (!user) {
-            // Avoid revealing whether the email exists
-            throw new ApiError(401, "Invalid credentials");
+            throw new ApiError(404, "User not found");
         }
 
         // Compare password
+        console.log("🔍 Comparing passwords...");
         const isPasswordCorrect = await bcrypt.compare(password, user.password);
+        console.log("Password match:", isPasswordCorrect ? "✅ YES" : "❌ NO");
+
         if (!isPasswordCorrect) {
             throw new ApiError(401, "Invalid credentials");
         }
 
         // Generate JWT token
         const token = generateToken(user._id);
+        console.log("✅ Token generated successfully");
 
         // Respond with token and basic user info
         res.status(200).json({
