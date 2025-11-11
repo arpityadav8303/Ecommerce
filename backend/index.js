@@ -10,6 +10,8 @@ import productRoutes from './routes/product.route.js';
 import { errorHandler, notFound } from './middleware/errorHandler.middleware.js';
 import { generateLimiter } from './middleware/ratelimitor.middleware.js';
 import specs from './swagger.js';
+import cartRoutes from "./routes/cart.route.js";
+
 
 dotenv.config();
 
@@ -62,6 +64,8 @@ app.get('/health', (req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
+app.use("/api/cart", cartRoutes);
+
 
 
 app.use(notFound);
