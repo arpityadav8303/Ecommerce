@@ -11,7 +11,10 @@ const generateLimiter = rateLimit({
   statusCode: 429,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => process.env.NODE_ENV === 'development',
+  // Skip rate limiting in development and test environments
+  skip: (req) => {
+    return process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+  },
   keyGenerator: ipKeyGenerator
 });
 
@@ -27,6 +30,10 @@ const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: false,
+  // Skip rate limiting in test environment
+  skip: (req) => {
+    return process.env.NODE_ENV === 'test';
+  },
   keyGenerator: (req) => req.body?.email || ipKeyGenerator(req)
 });
 
@@ -41,7 +48,10 @@ const searchLimiter = rateLimit({
   statusCode: 429,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => process.env.NODE_ENV === 'development',
+  // Skip rate limiting in development and test environments
+  skip: (req) => {
+    return process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+  },
   keyGenerator: ipKeyGenerator
 });
 
@@ -56,7 +66,10 @@ const productLimiter = rateLimit({
   statusCode: 429,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => process.env.NODE_ENV === 'development',
+  // Skip rate limiting in development and test environments
+  skip: (req) => {
+    return process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+  },
   keyGenerator: ipKeyGenerator
 });
 

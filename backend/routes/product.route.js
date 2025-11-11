@@ -1,6 +1,6 @@
 // Import all product controller functions
 import upload from "../middleware/multer.middleware.js";
-import { searchLimiter,productLimiter } from "../middleware/ratelimitor.middleware.js";
+import { searchLimiter, productLimiter } from "../middleware/ratelimitor.middleware.js";
 import {
   getAllProducts,
   getProductById,
@@ -13,12 +13,17 @@ import express from "express";
 
 const router = express.Router();
 
-router.get("/", searchLimiter,getAllProducts);
-router.get("/search",searchLimiter ,searchProducts);
-router.get("/category/:category",getProductsByCategory);
+// Apply searchLimiter to GET /products
+router.get("/", searchLimiter, getAllProducts);
+
+// Apply searchLimiter before the :id parameter routes
+router.get("/search", searchLimiter, searchProducts);
+
+// Important: Put specific routes BEFORE generic :id routes
+router.get("/category/:category", getProductsByCategory);
 router.get("/:id", getProductById);
 
-// 🛠️ Add product with image upload + validation
+// Add product with image upload + validation
 router.post(
   "/",
   productLimiter,
