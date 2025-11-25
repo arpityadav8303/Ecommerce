@@ -27,4 +27,3 @@ export const verifyAuth = async (req, res, next) => {
         });
     }
 };
-export {verifyAuth}

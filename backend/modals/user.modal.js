@@ -26,7 +26,9 @@ const UserSchema=new mongoose.Schema(
             type:String,
             required:true
         },
-    },
+        // backend/modals/user.modal.js - Add these fields
+
+      },
     {
         timestamps:true
     }

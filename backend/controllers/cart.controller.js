@@ -1,27 +1,28 @@
 import {Cart} from "../modals/cart.modal.js";
 import { ApiError } from "../utils/Apierrors.js";
 import {Product} from "../modals/product.modal.js";
-const getCart=async(req,res)=>{
-    try{
-        const userId=req.user._id;
-        let cart=await Cart.findOne({user:userId}).populate("items.product")
-        if(!cart){
-            throw new ApiError(404,"Cart not found")
+const getCart = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const cart = await Cart.findOne({ user: userId }).populate("items.product");
+
+        if (!cart) {
+            throw new ApiError(404, "Cart not found");
         }
+
         return res.status(200).json({
-           success: true,
-                message: "Cart is empty",
-                cart: {
-                    items: [],
-                    totalItems: 0,
-                    totalPrice: 0
-                }
-        })
+            success: true,
+            message: "Cart fetched successfully",
+            cart: {
+                items: cart.items,
+                totalItems: cart.items.length,
+                totalPrice: cart.totalPrice || 0
+            }
+        });
+    } catch (err) {
+        throw new ApiError(500, err.message);
     }
-    catch(err){
-        throw new ApiError(500,err.message)
-    }
-}
+};
 
 const addToCart=async(req,res)=>{
     try{

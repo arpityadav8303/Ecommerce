@@ -47,7 +47,9 @@ const ProductSchema = new mongoose.Schema(
         reviews: {
             type: Number,
             default: 0
-        }
+        },
+         // backend/modals/product.modal.js - Add seller info
+
     },
     {
         timestamps: true
