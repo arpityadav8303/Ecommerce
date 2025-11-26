@@ -176,11 +176,11 @@ const Home = () => {
         <div className="header-content">
           <h1 className="logo">🛍️ ShopHub</h1>
           <div className="header-right">
-            <div className="cart-badge">
+            <div className="cart-badge" onClick={() => navigate('/cart')}>
               🛒 Cart ({cart.length})
               {cart.length > 0 && (
                 <button onClick={handleClearCart} className="clear-cart-btn" title="Clear Cart">
-                  ✕
+                  ✕ 
                 </button>
               )}
             </div>
